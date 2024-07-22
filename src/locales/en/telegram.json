@@ -1,0 +1,16 @@
+{
+  "Cancel": "Cancel",
+  "commandStartReply": "🌟 Welcome to the Doomer admin panel 🌟",
+    "admin_panel_enter_msg":"👮🏻 Admin panel.\nSelect the section you are interested in:",
+  "admin_keyboard": {
+    "main_statistic": "📈 General statistics",
+    "ad_statistic": "📉 Advertising statistics",
+    "users_one_all": "👤 Users",
+    "tasks_one": "📃 Tasks",
+    "settings": "⚙ Bot Settings"
+  },
+  "cancel_button":"❌ Cancel",
+   "main_keyboard":{
+    "admin_panel":"👮🏻‍♀️ Admin panel"
+  }
+}
