@@ -9,6 +9,12 @@
     "tasks_one": "📃 Tasks",
     "settings": "⚙ Bot Settings"
   },
+  "users_sort_day":"1️⃣ Day",
+  "users_sort_week":"📅 Неделя",
+  "users_sort_all":"🌟 Всё время",
+  "export_users":"📃 Export",
+  "find_users":"🔎 Search",
+  "back":"🔙 Back",
   "cancel_button":"❌ Cancel",
    "main_keyboard":{
     "admin_panel":"👮🏻‍♀️ Admin panel"

@@ -26,25 +26,10 @@ const TelegramBot = (() => {
       database: "tgbot_db.json",
     })
 
-    //console.log("Current LocalSession DB:", localSession.DB)
-
-    // Telegraf will use `telegraf-session-local` configured above middleware
     bot.use(localSession.middleware())
 
     bot.catch((err, ctx) => {
       console.log(`Ooops, encountered an error for ${ctx.updateType}`, err)
-    })
-
-    // const stage = new Scenes.Stage<DoomerAdminContext>([TempScene])
-    // //bot.use(session())
-
-    // bot.use(stage.middleware())
-    bot.use((ctx, next) => {
-      ctx.params ??= {}
-      // we now have access to the the fields defined above
-      ctx.roomId ??= 0
-      ctx.text ??= ""
-      return next()
     })
 
     return bot

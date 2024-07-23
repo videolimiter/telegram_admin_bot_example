@@ -3,9 +3,9 @@ import i18next from "i18next"
 import { Markup } from "telegraf"
 import { message } from "telegraf/filters"
 import errorHandler from "./components/express/errorHandler"
-import callbacks from "./components/telegram/handlers/callbacks"
+import callbacks_admin_panel from "./components/telegram/handlers/callbacks._admin_panel"
 import { keyboardAdmin } from "./components/telegram/keyboards/keyboard_admin"
-import TelegramBot from "./components/telegram/telegramBot"
+import TelegramBot from "./components/telegram/telegram_bot"
 
 require("dotenv").config()
 
@@ -31,18 +31,20 @@ bot.start(async (ctx) => {
     Markup.keyboard([i18next.t("main_keyboard.admin_panel")]).resize(true)
   )
 })
-
+let msgId: number | undefined
 bot.on(message("text"), async (ctx) => {
   if (ctx.message.text === i18next.t("main_keyboard.admin_panel")) {
-    await ctx.reply(
+    const res = await ctx.reply(
       i18next.t("admin_panel_enter_msg", {
         lng: ctx.from?.language_code,
       }),
-      { ...keyboardAdmin(ctx.from?.language_code) }
+      Markup.inlineKeyboard(keyboardAdmin(ctx.from?.language_code))
     )
+    msgId = res.message_id
   }
 })
-bot.on("callback_query", async (ctx) => await callbacks(ctx))
+
+bot.on("callback_query", async (ctx) => await callbacks_admin_panel(ctx, msgId))
 
 bot.launch()
 
