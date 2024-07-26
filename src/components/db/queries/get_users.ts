@@ -3,53 +3,63 @@ require("dotenv").config()
 
 export interface IGetUsers {
   sorted?: "day" | "week" | "month" | "all"
-  qty?: number
-  page?: number
+  take?: number
+  skip?: number
 }
 
 const get_users = async (props: IGetUsers) => {
-  let users: any[] = []
+  let users: { users: any[]; countTotal: number } = {
+    users: [],
+    countTotal: 0,
+  }
   try {
-    const { qty, page, sorted } = props
+    const { sorted, take, skip } = props
     const client = await pgClient.getInstance()
     client.connect()
-
+    await client.query("SELECT COUNT(id) FROM users").then((res) => {
+      users.countTotal = res.rows[0].count
+    })
     switch (sorted) {
       case "all":
+        console.log("all")
         await client
-          .query(
-            'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC'
-          )
+          .query({
+            text: 'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC LIMIT $1 OFFSET $2',
+            values: [take?.toString(), skip?.toString()],
+          })
           .then((res) => {
             pgClient.close()
-            return (users = res.rows)
+            return (users.users = res.rows)
           })
         break
       case "week":
         await client
-          .query(
-            'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" WHERE lu."created_at" >= CURRENT_DATE - INTERVAL \'7 days\' GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC'
-          )
+          .query({
+            text: 'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" WHERE lu."created_at" >= CURRENT_DATE - INTERVAL \'7 days\' GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC LIMIT $1 OFFSET $2',
+            values: [take, skip],
+          })
           .then((res) => {
             pgClient.close()
-            return (users = res.rows)
+            return (users.users = res.rows)
           })
         break
 
       case "day":
         await client
-          .query(
-            'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" WHERE lu."created_at" >= CURRENT_DATE - INTERVAL \'1 days\' GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC'
-          )
+          .query({
+            text: 'SELECT users.username, users."telegramId", COUNT(lu.id) FROM users LEFT JOIN users AS lu ON lu."referralId" = users."referrerId" WHERE lu."created_at" >= CURRENT_DATE - INTERVAL \'1 days\' GROUP BY users.username, users."telegramId" ORDER BY COUNT(lu.id) DESC  LIMIT $1 OFFSET $2',
+            values: [take, skip],
+          })
           .then((res) => {
             pgClient.close()
-            return (users = res.rows)
+            return (users.users = res.rows)
           })
         break
 
       default:
         break
     }
+    pgClient.close()
     return users
   } catch (err) {
     console.log(err)

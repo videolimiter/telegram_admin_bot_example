@@ -1,7 +1,7 @@
 import i18next from "i18next"
 import { Markup } from "telegraf"
 
-export const keyboardAdmin = (lng?: string) => [
+export const admin_panel_keyboard = (lng?: string) => [
   [
     Markup.button.callback(
       i18next.t("admin_keyboard.main_statistic", { lng: lng }),

@@ -1,86 +1,162 @@
 import i18next from "i18next"
-import { Context, Markup } from "telegraf"
+import { Context, Markup, Scenes } from "telegraf"
 import { callbackQuery } from "telegraf/filters"
 import get_ad_statistic from "../../db/queries/get_ad_statistic"
 import get_main_statistic from "../../db/queries/get_main_statistic"
 
 import { back_button } from "../keyboards/back_button"
-import { keyboardAdmin } from "../keyboards/keyboard_admin"
-import { users_panel_keyboard } from "../keyboards/users_panel_keyboard"
+import { admin_panel_keyboard } from "../keyboards/admin_panel_keyboard"
+import { users_find_export_keyboard } from "../keyboards/users_find_export_keyboard"
 import { users_sort_keyboard } from "../keyboards/users_sort_keyboard"
-import { users_sorted_keyboard } from "../keyboards/users_sorted_keyboard"
+import { users_list_keyboard } from "../keyboards/users_list_keyboard"
 import get_users, { IGetUsers } from "../../db/queries/get_users"
 import { users_paginate_keyboard } from "../keyboards/users_paginate_keyboard"
 import get_user from "../../db/queries/get_user"
 import { user_panel_keyboard } from "../keyboards/user_panel_keyboard"
 import sort_string from "../../helpers/sort_string"
+import { sucsefull_hide_keyboard } from "../keyboards/sucsefull_hide_keyboard"
+import { number } from "zod"
+import set_hide_user from "../../db/queries/mutations/set_hide_user"
+import set_partner_user from "../../db/queries/mutations/set_partner_user"
+import user_msg_edit from "../messages/edit/user_msg_edit"
+import { DoomerAdminContext, SessionData } from "../telegram_bot"
+import { bot } from "../../../app"
 
-const callbacks_admin_panel = async (ctx: Context, msgId?: number) => {
+interface ICallbacksAdminPanel extends Context {
+  scene: Scenes.SceneContextScene<DoomerAdminContext>
+  session: SessionData
+  telegramId: number | string
+}
+
+const callbacks_admin_panel = async (ctx: ICallbacksAdminPanel) => {
   if (ctx.has(callbackQuery("data"))) {
+    const msgId = ctx.session.msg.id
+    let user: any
     try {
-      const users_regex = /users/
-      const user_regex = /user/
-      //sort users callbacks
+      const users_regex = /^users/
+      const user_regex = /^user/
+      const hide_regexp = /^hide/
+      const partner_regex = /^partner/
+      const change_pvc_regexp = /^change_pvc/
+      const change_doomercoins_regexp = /^change_doomer/
+
+      //callbacks
       switch (ctx.callbackQuery.data) {
+        //изменить pvc
+        case change_pvc_regexp.test(ctx.callbackQuery.data)
+          ? ctx.callbackQuery.data
+          : null:
+          ctx.session.idToChange = parseInt(
+            ctx.callbackQuery.data.split(":")[1]
+          )
+
+          await ctx.scene.enter("change_pvc_scene")
+
+          break
+        //изменить doomer
+        case change_doomercoins_regexp.test(ctx.callbackQuery.data)
+          ? ctx.callbackQuery.data
+          : null:
+          ctx.session.idToChange = parseInt(
+            ctx.callbackQuery.data.split(":")[1]
+          )
+
+          await ctx.scene.enter("change_doomercoins_scene")
+
+          break
+
+        //снять/добавить партнера
+        case partner_regex.test(ctx.callbackQuery.data)
+          ? ctx.callbackQuery.data
+          : null:
+          if (
+            await set_partner_user({
+              telegramId: Number(ctx.callbackQuery.data.split(":")[1]),
+            })
+          ) {
+            await await ctx.answerCbQuery(
+              "💼 Статус партнера был успешно изменен.",
+              { show_alert: true }
+            )
+            user = await get_user({
+              telegramId: Number(ctx.callbackQuery.data.split(":")[1]),
+            })
+            await user_msg_edit({
+              ctx,
+              user,
+              sorted: ctx.session.sorted,
+              msgId,
+            })
+          }
+          break
+
         // отображение пользователей
         case users_regex.test(ctx.callbackQuery.data)
           ? ctx.callbackQuery.data
           : null:
           const users_tag = ctx.callbackQuery.data.split(":")
-          const users_sorted = users_tag[2] as IGetUsers["sorted"]
+          ctx.session.sorted = users_tag[2] as IGetUsers["sorted"]
 
           const page = Number(users_tag[1])
+          console.log("🚀 ~ constcallbacks_admin_panel= ~ page:", page)
+          const take = 20
+          console.log("🚀 ~ constcallbacks_admin_panel= ~ take:", take)
 
-          const qty = 10
           const users = await get_users({
-            sorted: users_sorted,
-            qty,
-            page: Number(page),
+            sorted: ctx.session.sorted,
+            take,
+            skip: Number(page - 1) * take,
           })
 
-          const last_page = users?.length ? Math.ceil(users?.length / qty) : 1
+          const last_page = users?.countTotal
+            ? Math.ceil(users.countTotal / take)
+            : 1
 
-          const usersNew = users?.slice(
-            (Number(page) - 1) * qty,
-            (Number(page) - 1) * qty + qty
-          )
-
-          await ctx.telegram.editMessageText(
-            ctx.chat?.id.toString() || "",
-            msgId,
-            msgId?.toString(),
-            `👤 Список пользователей\n\nКоличество пользователей: ${
-              users?.length
-            }
-            \nТип сортировки по реферелам: ${sort_string(users_sorted)}
+          const users_list = users?.users
+          if (users_list)
+            await ctx.telegram.editMessageText(
+              ctx.chat?.id.toString() || "",
+              msgId,
+              msgId?.toString(),
+              `👤 Список пользователей\n\nКоличество пользователей: ${
+                users?.countTotal
+              }
+            \nТип сортировки по реферелам: ${sort_string(ctx.session.sorted)}
             `,
-            {
-              parse_mode: "HTML",
-              ...Markup.inlineKeyboard([
-                ...users_panel_keyboard(),
-                ...users_sorted_keyboard({
-                  users: usersNew,
-                  page: Number(page),
-                  sorted: users_sorted,
-                }),
-                users_paginate_keyboard({
-                  page,
-                  last_page,
-                  sorted: users_sorted,
-                }),
-                users_sort_keyboard({ page, sorted: users_sorted }),
-                back_button(),
-              ]),
-            }
-          )
+              {
+                parse_mode: "HTML",
+                ...Markup.inlineKeyboard([
+                  ...users_find_export_keyboard(),
+                  ...users_list_keyboard({
+                    users: users_list,
+                    sorted: ctx.session.sorted,
+                  }),
+                  users_paginate_keyboard({
+                    page,
+                    last_page,
+                    sorted: ctx.session.sorted,
+                  }),
+                  users_sort_keyboard({ page, sorted: ctx.session.sorted }),
+                  back_button(),
+                ]),
+              }
+            )
           switch (ctx.callbackQuery.data.split(":")[2]) {
             case "day":
               console.log("day", page)
-              await get_users({ sorted: "day", page })
+              await get_users({
+                sorted: "day",
+                take,
+                skip: Number(page - 1) * take,
+              })
               break
             case "week":
               console.log("week", page)
-              const users = await get_users({ sorted: "week", page })
+              const users = await get_users({
+                sorted: "week",
+                take,
+                skip: Number(page - 1) * take,
+              })
               break
             default:
               break
@@ -91,37 +167,38 @@ const callbacks_admin_panel = async (ctx: Context, msgId?: number) => {
         case user_regex.test(ctx.callbackQuery.data)
           ? ctx.callbackQuery.data
           : null:
-          const user_tag = ctx.callbackQuery.data.split(":")[1]
+          const telegramId = Number(ctx.callbackQuery.data.split(":")[1])
 
-          const user_sorted = ctx.callbackQuery.data.split(
+          ctx.session.sorted = ctx.callbackQuery.data.split(
             ":"
           )[2] as IGetUsers["sorted"]
 
-          const user = await get_user({ user_tag, sorted: user_sorted })
-          await ctx.telegram.editMessageText(
-            ctx.chat?.id.toString() || "",
-            msgId,
-            msgId?.toString(),
-            `ℹ Пользователь  ${user.username}  (<code>${user.telegramId}</code>)
-            
-          👁 Скрыт из лидерборда:  ${user.IsHidden ? "✅" : "❌"} 
-          💼 Партнер: ${user.IsPartner ? "✅" : "❌"}
-          🔗 Реферал: ${user.referralId ? user.referralId : "❌"}
-           👥 Приглашенные рефералы: ${user.count}
+          user = await get_user({
+            telegramId,
+            sorted: ctx.session.sorted,
+          })
+          await user_msg_edit({ ctx, user, sorted: ctx.session.sorted, msgId })
 
-            💰 $DOOMER: ${user.doomCoins}
-            💰 $PVC: ${user.pvc}
-            👥 Пригласительный ID: <code>r-${user.telegramId}</code>
-          `,
-            {
-              parse_mode: "HTML",
-              ...Markup.inlineKeyboard([
-                ...user_panel_keyboard({ user, sorted: user_sorted }),
-              ]),
-            }
-          )
           break
+        // скрыть пользователя
+        case hide_regexp.test(ctx.callbackQuery.data)
+          ? ctx.callbackQuery.data
+          : null:
+          if (
+            await set_hide_user({
+              telegramId: Number(ctx.callbackQuery.data.split(":")[1]),
+            })
+          ) {
+            await await ctx.answerCbQuery(
+              "👁 Статус отображения был успешно изменен",
+              { show_alert: true }
+            )
+          }
+          break
+        case "find_user":
+          ctx.scene.enter("find_user_scene")
 
+          break
         case "back_to_main_admin_panel":
           // await ctx.telegram.sendMessage(
           //   ctx.chat?.id.toString() ?? "",
@@ -136,7 +213,7 @@ const callbacks_admin_panel = async (ctx: Context, msgId?: number) => {
             i18next.t("admin_panel_enter_msg", {
               lng: ctx.from?.language_code,
             }),
-            Markup.inlineKeyboard(keyboardAdmin(ctx.from?.language_code))
+            Markup.inlineKeyboard(admin_panel_keyboard(ctx.from?.language_code))
           )
           break
         case "main_statistic":

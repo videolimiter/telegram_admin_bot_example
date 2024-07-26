@@ -4,36 +4,85 @@ require("dotenv").config()
 
 export interface IGetUser {
   sorted?: "day" | "week" | "month" | "all"
-  user_tag: string | number
+  telegramId: number | string
 }
 
 const get_user = async (props: IGetUser) => {
+  const { telegramId, sorted } = props
   let user: any
+
+  function checkType(value: any) {
+    if (typeof new Number(value) === "number") {
+      console.log("Это число")
+    } else if (typeof value === "string") {
+      console.log("Это текст")
+    } else {
+      console.log("Тип не определен")
+    }
+  }
+  console.log(checkType(telegramId))
+
   try {
-    const { user_tag, sorted } = props
     const client = await pgClient.getInstance()
     client.connect()
-
-    if (isNumberObject(new Number(user_tag))) {
-      const telegramId = user_tag as number
+    if (typeof new Number(telegramId) === "number") {
       await client
-        .query(
-          'SELECT users.username, users."referralId", users."telegramId", COUNT(rf.id), w."pvc", w."doomCoins", users."IsPartner", users."IsHidden", lu."telegramId", lu.username FROM users LEFT JOIN users AS rf ON rf."referralId" = users."referrerId" LEFT JOIN users AS lu ON lu."referrerId" = users."referralId" LEFT JOIN wallets AS w ON w."id" = users."walletId" WHERE users."telegramId"::bigint = $1 GROUP BY users.username, users."referralId", users."telegramId", w."pvc", w."doomCoins", users."IsPartner", users."IsHidden", lu."telegramId", lu.username',
-          [telegramId]
-        )
-        .then((res) => {
-          return (user = res.rows[0])
+        .query({
+          text: `SELECT * FROM public.users WHERE "telegramId"= $1`,
+          values: [telegramId.toString()],
         })
-    } else {
-      const username = user_tag as string
-      await client
-        .query(
-          'SELECT users.username, users."referralId", users."telegramId", COUNT(rf.id), w."pvc", w."doomCoins", users."IsPartner", users."IsHidden", lu."telegramId", lu.username FROM users LEFT JOIN users AS rf ON rf."referralId" = users."referrerId" LEFT JOIN users AS lu ON lu."referrerId" = users."referralId" LEFT JOIN wallets AS w ON w."id" = users."walletId" WHERE users."username" = $1 GROUP BY users.username, users."referralId", users."telegramId", w."pvc", w."doomCoins", users."IsPartner", users."IsHidden", lu."telegramId", lu.username',
-          [username]
-        )
-        .then((res) => {
+        .then(async (res) => {
+          user = res.rows[0]
+          await client
+            .query({
+              text: `SELECT COUNT(*) FROM public.users WHERE "referralId"= $1`,
+              values: [user.referrerId],
+            })
+            .then(async (res) => {
+              user.refCount = res.rows[0].count
+              await client
+                .query({
+                  text: `SELECT * FROM public.WALLETS WHERE "id"= $1`,
+                  values: [user.walletId],
+                })
+                .then(async (res) => {
+                  user.doomCoins = res.rows[0].doomCoins
+                  user.pvc = res.rows[0].pvc
+                  pgClient.close()
+                })
+            })
           pgClient.close()
-          return (user = res.rows[0])
+          return user
+        })
+    }
+    if (typeof telegramId === "string") {
+      await client
+        .query({
+          text: `SELECT * FROM public.users WHERE "username"= $1`,
+          values: [telegramId.toString()],
+        })
+        .then(async (res) => {
+          user = res.rows[0]
+          await client
+            .query({
+              text: `SELECT COUNT(*) FROM public.users WHERE "referralId"= $1`,
+              values: [user.referrerId],
+            })
+            .then(async (res) => {
+              user.refCount = res.rows[0].count
+              await client
+                .query({
+                  text: `SELECT * FROM public.WALLETS WHERE "id"= $1`,
+                  values: [user.walletId],
+                })
+                .then(async (res) => {
+                  user.doomCoins = res.rows[0].doomCoins
+                  user.pvc = res.rows[0].pvc
+                  pgClient.close()
+                })
+            })
+          pgClient.close()
+          return user
         })
     }
   } catch (err) {

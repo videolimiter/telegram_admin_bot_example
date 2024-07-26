@@ -12,7 +12,9 @@ export const user_panel_keyboard = (props: IUserPanelKeyBoard) => {
   return [
     [
       Markup.button.callback(
-        user.IsHidden ? "👁 Показать пользователя" : "👁 Скрыть пользователя",
+        (user.IsHidden as boolean)
+          ? "👁 Показать пользователя"
+          : "👁 Скрыть пользователя",
         "hide:" + user.telegramId
       ),
     ],

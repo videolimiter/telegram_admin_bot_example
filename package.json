@@ -1,7 +1,7 @@
 {
-  "name": "tgbot.animasfera",
+  "name": "tgadminbot",
   "version": "1.0.0",
-  "description": "Telegram Bot for Animasfera",
+  "description": "Telegram Bot Doomer Admin Panel",
   "main": "index.js",
   "scripts": {
     "dev": "nodemon --config nodemon.json src/app.ts",
@@ -9,13 +9,9 @@
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://git.jetbrains.space/leela/bot-as/tgbot.animasfera.git"
-  },
   "keywords": [
     "tgbot",
-    "animasfera"
+    "doomer"
   ],
   "enabledApiProposals-property": [
     "lokalise.i18n-ally"
